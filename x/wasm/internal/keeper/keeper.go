@@ -35,7 +35,7 @@ type Keeper struct {
 	router sdk.Router
 
 	wasmer    wasm.Wasmer
-	wasmerForQueries    wasm.Wasmer
+	wasmerForQueries    [128]wasm.Wasmer
 	querier   types.Querier
 	msgParser types.MsgParser
 
@@ -51,15 +51,19 @@ func NewKeeper(cdc *codec.Codec, storeKey sdk.StoreKey,
 	supportedFeatures string,
 	wasmConfig *config.Config) Keeper {
 	homeDir := viper.GetString(flags.FlagHome)
-	wasmer, err := wasm.NewWasmer(filepath.Join(homeDir, config.DBDir), supportedFeatures, 0)
+	wasmer, err := wasm.NewWasmer(filepath.Join(homeDir, config.DBDir), supportedFeatures, 2000000000)
 	if err != nil {
 		panic(err)
 	}
 
-	wasmerForQuerier, err := wasm.NewWasmer(filepath.Join(homeDir, config.DBDir), supportedFeatures, 0)
+	var wasmerForQueries [128]wasm.Wasmer
+	for i := 0; i< 128; i++ {
+		wasmerRedundancy, err := wasm.NewWasmer(filepath.Join(homeDir, config.DBDir), supportedFeatures, 512000000)
+		if err != nil {
+			panic(err)
+		}
 
-	if err != nil {
-		panic(err)
+		wasmerForQueries[i] = *wasmerRedundancy
 	}
 
 	// set KeyTable if it has not already been set
@@ -72,7 +76,7 @@ func NewKeeper(cdc *codec.Codec, storeKey sdk.StoreKey,
 		cdc:              cdc,
 		paramSpace:       paramspace,
 		wasmer:           *wasmer,
-		wasmerForQueries: *wasmerForQuerier,
+		wasmerForQueries: wasmerForQueries,
 		accountKeeper:    accountKeeper,
 		bankKeeper:       bankKeeper,
 		supplyKeeper:     supplyKeeper,
@@ -234,12 +238,16 @@ func (k *Keeper) getWasmer(ctx sdk.Context) *wasm.Wasmer {
 
 	// fallback to wasmerForQueries if unknown state
 	if !ok {
-		return &k.wasmerForQueries
+		return &k.wasmerForQueries[0]
 	}
 
 	if executionState {
 		return &k.wasmer
 	} else {
-		return &k.wasmerForQueries
+		wasmerIndex, ok := ctx.Value(types.WasmerIdx).(int)
+		if !ok {
+			wasmerIndex = 0
+		}
+		return &k.wasmerForQueries[wasmerIndex]
 	}
 }

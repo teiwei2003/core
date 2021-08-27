@@ -15,6 +15,8 @@ import (
 
 // NewQuerier creates a new querier
 func NewQuerier(keeper Keeper) sdk.Querier {
+	var reqIdx = 0
+
 	return func(ctx sdk.Context, path []string, req abci.RequestQuery) ([]byte, error) {
 		// flag this query as non-execution.
 		// it could be possible that this querier is called by another contract during execution.
@@ -22,6 +24,8 @@ func NewQuerier(keeper Keeper) sdk.Querier {
 		_, executionStateExists := ctx.Value(types.IsContractExecution).(bool)
 		if !executionStateExists {
 			ctx = ctx.WithValue(types.IsContractExecution, false)
+			ctx = ctx.WithValue(types.WasmerIdx, reqIdx)
+			reqIdx = (reqIdx + 1) % 128
 		}
 
 		switch path[0] {

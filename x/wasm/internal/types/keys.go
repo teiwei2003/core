@@ -24,6 +24,7 @@ const (
 	// this specific context is a contract execution (i.e. not wasm query)
 	// This will result in a different wasmer context to be used
 	IsContractExecution = "isContractExecution"
+	WasmerIdx = "wasmerIndex"
 )
 
 // Keys for wasm store
