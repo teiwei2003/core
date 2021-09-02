@@ -28,10 +28,20 @@ func TestStoreCode(t *testing.T) {
 	wasmCode, err := ioutil.ReadFile("./testdata/hackatom.wasm")
 	require.NoError(t, err)
 
+	// register create interceptor
+	var isCreateInterceptorRun = false
+	keeper.interceptCodeCreate = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		isCreateInterceptorRun = true
+		return nil
+	}
+
 	// Create contract
 	codeID, err := keeper.StoreCode(ctx, creator, wasmCode)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), codeID)
+	require.True(t, isCreateInterceptorRun)
 
 	// Verify content
 	storedCode, err := keeper.GetByteCode(ctx, codeID)
@@ -47,6 +57,15 @@ func TestMigrateCode(t *testing.T) {
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
 	fakeAccount := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
 
+	// register interceptor
+	var isCreateInterceptorRun = false
+	keeper.interceptCodeCreate = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		isCreateInterceptorRun = true
+		return nil
+	}
+
 	codeID := uint64(1)
 	keeper.SetCodeInfo(ctx, codeID, types.CodeInfo{
 		CodeID:   1,
@@ -59,10 +78,12 @@ func TestMigrateCode(t *testing.T) {
 
 	err = keeper.MigrateCode(ctx, codeID, fakeAccount, wasmCode)
 	require.Error(t, err)
+	require.False(t, isCreateInterceptorRun)
 
 	err = keeper.MigrateCode(ctx, codeID, creator, wasmCode)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), codeID)
+	require.True(t, isCreateInterceptorRun)
 
 	// Verify content
 	storedCode, err := keeper.GetByteCode(ctx, codeID)
@@ -78,17 +99,34 @@ func TestStoreCodeWithHugeCode(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, keeper := input.Ctx, input.WasmKeeper
 
+	var isCreateInterceptorRun = false
+	keeper.interceptCodeCreate = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		isCreateInterceptorRun = true
+		return nil
+	}
+
 	_, _, creator := keyPubAddr()
 	wasmCode := make([]byte, keeper.MaxContractSize(ctx)+1)
 	_, err := keeper.StoreCode(ctx, creator, wasmCode)
 
 	require.Error(t, err)
+	require.False(t, isCreateInterceptorRun)
 	require.Contains(t, err.Error(), "contract size is too huge")
 }
 
 func TestCreateWithGzippedPayload(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var isCreateInterceptorRun = false
+	keeper.interceptCodeCreate = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		isCreateInterceptorRun = true
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
@@ -99,6 +137,8 @@ func TestCreateWithGzippedPayload(t *testing.T) {
 	contractID, err := keeper.StoreCode(ctx, creator, wasmCode)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), contractID)
+	require.True(t, isCreateInterceptorRun)
+
 	// and verify content
 	storedCode, err := keeper.GetByteCode(ctx, contractID)
 	require.NoError(t, err)
@@ -110,6 +150,14 @@ func TestCreateWithGzippedPayload(t *testing.T) {
 func TestInstantiate(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var isLoadInterceptorRun = false
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		isLoadInterceptorRun = true
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
@@ -134,12 +182,18 @@ func TestInstantiate(t *testing.T) {
 	// create with no balance is also legal
 	addr, _, err := keeper.InstantiateContract(ctx, codeID, creator, sdk.AccAddress{}, initMsgBz, nil)
 	require.NoError(t, err)
+	require.True(t, isLoadInterceptorRun)
 	require.Equal(t, "cosmos18vd8fpwxzck93qlwghaj6arh4p7c5n89uzcee5", addr.String())
 }
 
 func TestInstantiateWithNonExistingCodeID(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		require.Fail(t, "interceptor should not have run")
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
@@ -156,6 +210,11 @@ func TestInstantiateWithNonExistingCodeID(t *testing.T) {
 func TestInstantiateWithBigInitMsg(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		require.Fail(t, "interceptor should not have run")
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit)
@@ -176,6 +235,14 @@ func TestInstantiateWithBigInitMsg(t *testing.T) {
 func TestExecute(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var loadInterceptorRunCount = 0
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		require.True(t, len(codeHash) > 0)
+
+		loadInterceptorRunCount++
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	topUp := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 5000))
@@ -244,12 +311,19 @@ func TestExecute(t *testing.T) {
 	require.NotNil(t, contractAcct)
 	assert.Equal(t, sdk.Coins{}, bankKeeper.GetAllBalances(input.Ctx, addr))
 
+	require.Equal(t, loadInterceptorRunCount, 3) // 1 instantiate, 2 executes
+
 	t.Logf("Duration: %v (35619 gas)\n", diff)
 }
 
 func TestExecuteWithNonExistingContractAddress(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		require.Fail(t, "load interceptor should not have run")
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	creator := createFakeFundedAccount(ctx, accKeeper, bankKeeper, deposit.Add(deposit...))
@@ -263,6 +337,13 @@ func TestExecuteWithNonExistingContractAddress(t *testing.T) {
 func TestExecuteWithHugeMsg(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var interceptorRunCount = 0
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		// require.Fail(t, "load interceptor should not have run")
+		interceptorRunCount++
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	topUp := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 5000))
@@ -290,12 +371,19 @@ func TestExecuteWithHugeMsg(t *testing.T) {
 	msgBz := make([]byte, keeper.MaxContractMsgSize(ctx)+1)
 	_, err = keeper.ExecuteContract(ctx, addr, fred, msgBz, topUp)
 	require.Error(t, err)
+	require.Equal(t, interceptorRunCount, 1) // should only run for instantiation
 	require.Contains(t, err.Error(), "execute msg size is too huge")
 }
 
 func TestExecuteWithPanic(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var interceptorRunCount = 0
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		interceptorRunCount++
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	topUp := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 5000))
@@ -322,11 +410,18 @@ func TestExecuteWithPanic(t *testing.T) {
 	// let's make sure we get a reasonable error, no panic/crash
 	_, err = keeper.ExecuteContract(ctx, addr, fred, []byte(`{"panic":{}}`), topUp)
 	require.Error(t, err)
+	require.Equal(t, 2, interceptorRunCount) // panic aside, valid loads happen exactly twice
 }
 
 func TestExecuteWithCpuLoop(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var interceptorRunCount = 0
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		interceptorRunCount++
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	topUp := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 5000))
@@ -358,11 +453,18 @@ func TestExecuteWithCpuLoop(t *testing.T) {
 	require.PanicsWithValue(t, sdk.ErrorOutOfGas{Descriptor: "Contract Execution"}, func() {
 		_, _ = keeper.ExecuteContract(ctx, addr, fred, []byte(`{"cpu_loop":{}}`), nil)
 	})
+	require.Equal(t, 2, interceptorRunCount) // panic aside, load interceptor should have run exactly twice
 }
 
 func TestExecuteWithStorageLoop(t *testing.T) {
 	input := CreateTestInput(t)
 	ctx, accKeeper, bankKeeper, keeper := input.Ctx, input.AccKeeper, input.BankKeeper, input.WasmKeeper
+
+	var interceptorRunCount = 0
+	keeper.interceptCodeLoad = func(codeHash []byte) error {
+		interceptorRunCount++
+		return nil
+	}
 
 	deposit := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 100000))
 	topUp := sdk.NewCoins(sdk.NewInt64Coin(core.MicroLunaDenom, 5000))
@@ -395,6 +497,7 @@ func TestExecuteWithStorageLoop(t *testing.T) {
 	require.PanicsWithValue(t, sdk.ErrorOutOfGas{Descriptor: "Contract Execution"}, func() {
 		_, err = keeper.ExecuteContract(ctx, addr, fred, []byte(`{"storage_loop":{}}`), nil)
 	})
+	require.Equal(t, 2, interceptorRunCount) // panic aside, load interceptor should have run exactly twice
 }
 
 func TestMigrate(t *testing.T) {

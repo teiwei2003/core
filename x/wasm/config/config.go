@@ -52,6 +52,8 @@ func DefaultConfig() *Config {
 		WriteVMMemoryCacheSize: DefaultWriteVMMemoryCacheSize,
 		ReadVMMemoryCacheSize:  DefaultReadVMMemoryCacheSize,
 		NumReadVMs:             DefaultNumReadVM,
+		InterceptCodeCreate: DefaultInterceptorNoop,
+		InterceptCodeLoad:   DefaultInterceptorNoop,
 	}
 }
 

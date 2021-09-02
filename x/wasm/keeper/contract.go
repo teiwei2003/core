@@ -34,6 +34,15 @@ func (k Keeper) CompileCode(ctx sdk.Context, wasmCode []byte) (codeHash []byte, 
 		return nil, nil, sdkerrors.Wrap(types.ErrStoreCodeFailed, err.Error())
 	}
 
+	// run create interceptor if exists.
+	// default interceptCodeCreate is a no-op function, so it should be safe under normal usage
+	if k.interceptCodeCreate != nil {
+		if err := k.interceptCodeCreate(codeHash); err != nil {
+			return nil, nil, err
+		}
+	}
+
+
 	report, err = k.wasmVM.AnalyzeCode(codeHash)
 	if err != nil {
 		return nil, nil, sdkerrors.Wrap(types.ErrStoreCodeFailed, err.Error())
@@ -56,14 +65,6 @@ func (k Keeper) StoreCode(ctx sdk.Context, creator sdk.AccAddress, wasmCode []by
 
 	codeID++
 	codeInfo := types.NewCodeInfo(codeID, codeHash, creator)
-
-	// run create interceptor if exists.
-	// default interceptCodeCreate is a no-op function, so it should be safe under normal usage
-	if k.interceptCodeCreate != nil {
-		if err := k.interceptCodeCreate(codeHash); err != nil {
-			return 0, err
-		}
-	}
 
 	k.SetLastCodeID(ctx, codeID)
 	k.SetCodeInfo(ctx, codeID, codeInfo)
@@ -90,6 +91,14 @@ func (k Keeper) MigrateCode(ctx sdk.Context, codeID uint64, creator sdk.AccAddre
 	codeHash, report, err := k.CompileCode(ctx, wasmCode)
 	if err != nil {
 		return err
+	}
+
+	// run create interceptor if exists.
+	// default interceptCodeCreate is a no-op function, so it should be safe under normal usage
+	if k.interceptCodeCreate != nil {
+		if err := k.interceptCodeCreate(codeHash); err != nil {
+			return err
+		}
 	}
 
 	codeInfo.CodeHash = codeHash
