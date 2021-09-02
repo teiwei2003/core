@@ -57,6 +57,14 @@ func (k Keeper) StoreCode(ctx sdk.Context, creator sdk.AccAddress, wasmCode []by
 	codeID++
 	codeInfo := types.NewCodeInfo(codeID, codeHash, creator)
 
+	// run create interceptor if exists.
+	// default interceptCodeCreate is a no-op function, so it should be safe under normal usage
+	if k.interceptCodeCreate != nil {
+		if err := k.interceptCodeCreate(codeHash); err != nil {
+			return 0, err
+		}
+	}
+
 	k.SetLastCodeID(ctx, codeID)
 	k.SetCodeInfo(ctx, codeID, codeInfo)
 	k.Logger(ctx).Debug("storing new contract", "features", report.RequiredFeatures, "code_id", codeID)
@@ -150,6 +158,13 @@ func (k Keeper) InstantiateContract(
 	contractStoreKey := types.GetContractStoreKey(contractAddress)
 	contractStore := prefix.NewStore(ctx.KVStore(k.storeKey), contractStoreKey)
 
+	// ensure code hash existence with interceptor
+	if k.interceptCodeLoad != nil {
+		if err := k.interceptCodeLoad(codeInfo.CodeHash); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// instantiate wasm contract
 	res, gasUsed, err := k.wasmVM.Instantiate(
 		codeInfo.CodeHash,
@@ -228,6 +243,14 @@ func (k Keeper) ExecuteContract(
 
 	env := types.NewEnv(ctx, contractAddress)
 	info := types.NewInfo(sender, coins)
+
+	// ensure code hash existence with interceptor
+	if k.interceptCodeLoad != nil {
+		if err := k.interceptCodeLoad(codeInfo.CodeHash); err != nil {
+			return nil, err
+		}
+	}
+
 	res, gasUsed, err := k.wasmVM.Execute(
 		codeInfo.CodeHash,
 		env,
@@ -308,6 +331,13 @@ func (k Keeper) MigrateContract(
 	prefixStoreKey := types.GetContractStoreKey(contractAddress)
 	prefixStore := prefix.NewStore(ctx.KVStore(k.storeKey), prefixStoreKey)
 
+	// ensure code hash existence with interceptor
+	if k.interceptCodeLoad != nil {
+		if err := k.interceptCodeLoad(newCodeInfo.CodeHash); err != nil {
+			return nil, err
+		}
+	}
+
 	res, gasUsed, err := k.wasmVM.Migrate(
 		newCodeInfo.CodeHash,
 		env,
@@ -367,6 +397,14 @@ func (k Keeper) reply(
 	}
 
 	env := types.NewEnv(ctx, contractAddress)
+
+	// ensure code hash existence with interceptor
+	if k.interceptCodeLoad != nil {
+		if err := k.interceptCodeLoad(codeInfo.CodeHash); err != nil {
+			return nil, err
+		}
+	}
+
 	res, gasUsed, err := k.wasmVM.Reply(
 		codeInfo.CodeHash,
 		env,
@@ -435,6 +473,13 @@ func (k Keeper) queryToContract(ctx sdk.Context, contractAddress sdk.AccAddress,
 	wasmVM := k.wasmVM
 	if len(wasmVMs) != 0 {
 		wasmVM = wasmVMs[0]
+	}
+
+	// ensure code hash existence with interceptor
+	if k.interceptCodeLoad != nil {
+		if err := k.interceptCodeLoad(codeInfo.CodeHash); err != nil {
+			return nil, err
+		}
 	}
 
 	queryResult, gasUsed, err := wasmVM.Query(
