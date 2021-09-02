@@ -36,6 +36,12 @@ type Config struct {
 
 	// The number of read WASM VMs
 	NumReadVMs uint32 `mapstructure:"num-read-vms"`
+
+	// Hook function to run after code store
+	InterceptCodeCreate CodeCreateInterceptor
+
+	// Hook function to run in case of code read fails
+	InterceptCodeLoad CodeLoadInterceptor
 }
 
 // DefaultConfig returns the default settings for WasmConfig
@@ -57,6 +63,10 @@ func GetConfig(appOpts servertypes.AppOptions) *Config {
 		WriteVMMemoryCacheSize: cast.ToUint32(appOpts.Get("wasm.write-vm-memory-cache-size")),
 		ReadVMMemoryCacheSize:  cast.ToUint32(appOpts.Get("wasm.read-vm-memory-cache-size")),
 		NumReadVMs:             cast.ToUint32(appOpts.Get("wasm.num-read-vms")),
+
+		// default is noop
+		InterceptCodeCreate: DefaultInterceptorNoop,
+		InterceptCodeLoad:   DefaultInterceptorNoop,
 	}
 }
 

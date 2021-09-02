@@ -44,6 +44,9 @@ type Keeper struct {
 
 	// WASM config values
 	wasmConfig *config.Config
+
+	interceptCodeCreate config.CodeCreateInterceptor
+	interceptCodeLoad   config.CodeLoadInterceptor
 }
 
 // NewKeeper creates a new contract Keeper instance
@@ -109,6 +112,11 @@ func NewKeeper(
 		wasmConfig:          wasmConfig,
 		msgParser:           types.NewWasmMsgParser(),
 		querier:             types.NewWasmQuerier(),
+
+		// make interceptors part of keeper.
+		// default is nil upon creating config itself to be fail-safe
+		interceptCodeCreate: wasmConfig.InterceptCodeCreate,
+		interceptCodeLoad:   wasmConfig.InterceptCodeLoad,
 	}
 }
 
