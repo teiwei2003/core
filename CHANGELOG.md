@@ -1,3 +1,28 @@
+## v0.5.14
+
+This release contains wasmvm bugfix to prevent non-deterministic error messages comes out from wasmvm.
+
+- [\#635](https://github.com/terra-money/core/pull/635) bump wasmvm to v0.16.3
+
+## v0.5.13
+
+This release contains oracle tally bugfix, which was not sorting cross rate ballot before computing weighted median. It makes the cross rate selected quite randomly...
+
+This update will sort cross rate ballot before computing weighted median value.
+
+- [b073fb1](https://github.com/terra-money/core/commit/b073fb18e5107caee077f214b5fad4de53b055f5) sort cross rate ballot and enforce sorted before computing weighted median
+
+## v0.5.12
+
+This release contains [IAVL bugfix](https://github.com/cosmos/iavl/pull/449)
+
+### Improvements
+- [\#620](https://github.com/terra-money/core/pull/620) bump SDK to v0.44.5
+
+### Bug Fixes
+- [\#621](https://github.com/terra-money/core/pull/621) fix iterator key on export for zero height
+- [\#607](https://github.com/terra-money/core/pull/607) skip GetBytes when exporting not migrated code
+
 ## v0.5.11
 
 ### Bug Fixes
@@ -7,6 +32,7 @@
 
 ### Improvements
 - [\#601](https://github.com/terra-money/core/pull/601) revert readvm-pool feature
+- [\#594](https://github.com/terra-money/core/pull/594) bump SDK to v0.44.3 and Tendermint to v0.34.14
 - [\#593](https://github.com/terra-money/core/pull/593) revert jemalloc integration from wasmvm & add troubleshoot section to docs
 
 ## [v0.5.9]
