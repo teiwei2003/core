@@ -41,7 +41,7 @@
 ## 指标
 财政部跟踪当前和以前时期的以下指标：
 
-###税收奖励
+### 税收奖励
 “epoch”的税收奖励。
 
 - TaxReward：`0x06<epoch_Bytes> -> amino(sdk.Dec)`
