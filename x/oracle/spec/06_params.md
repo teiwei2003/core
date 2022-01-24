@@ -5,7 +5,7 @@ order: 7
 
 # Parameters
 
-The market module contains the following parameters:
+The oracle module contains the following parameters:
 
 | Key                      | Type         | Example                |
 |--------------------------|--------------|------------------------|
